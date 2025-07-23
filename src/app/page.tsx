@@ -10,21 +10,30 @@ import {
   FaVolumeUp,
 } from "react-icons/fa";
 
+// Utilitário para formatar tempo em mm:ss
+function formatTime(seconds: number): string {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins.toString().padStart(2, "0")}:${secs
+    .toString()
+    .padStart(2, "0")}`;
+}
+
 const videoList = [
   {
     title: "Elephant Dream | The first Blender Open Movie from 2006",
-    src: "./assets/video01.mp4",
-    thumb: "./assets/thumb01.jpg",
+    src: "/assets/video01.mp4",
+    thumb: "/assets/thumb01.jpg",
   },
   {
     title: "Gatinho na grama",
-    src: "./assets/video02.mp4",
-    thumb: "./assets/thumb02.jpg",
+    src: "/assets/video02.mp4",
+    thumb: "/assets/thumb02.jpg",
   },
   {
     title: "Futebol",
-    src: "./assets/video03.mp4",
-    thumb: "./assets/thumb03.jpg",
+    src: "/assets/video03.mp4",
+    thumb: "/assets/thumb03.jpg",
   },
 ];
 
@@ -37,21 +46,40 @@ export default function Home() {
   const [volume, setVolume] = useState(1);
   const [videoError, setVideoError] = useState(false);
 
-  // Troca de vídeo: resetar estados, mas não reproduzir
-  useEffect(() => {
-    const video = videoRef.current;
-    setVideoError(false);
-    setPlaying(false);
-    setCurrentTime(0);
+  // Atualiza dados ao trocar de vídeo
+useEffect(() => {
+  const video = videoRef.current;
+  setVideoError(false);
+  setCurrentTime(0);
 
+  if (video) {
+    video.load();
+    video.currentTime = 0;
+    video.volume = volume;
+    video.muted = muted;
+
+    // Sempre reproduz automaticamente o novo vídeo
+    video
+      .play()
+      .then(() => setPlaying(true))
+      .catch((err) => {
+        console.error("Erro ao reproduzir:", err);
+        setPlaying(false);
+      });
+  }
+
+  const handleLoadedMetadata = () => {
     if (video) {
-      video.pause();
-      video.load();
-      video.currentTime = 0;
-      video.volume = volume;
-      video.muted = muted;
+      setCurrentTime(video.currentTime);
     }
-  }, [currentIndex]);
+  };
+
+  video?.addEventListener("loadedmetadata", handleLoadedMetadata);
+  return () => {
+    video?.removeEventListener("loadedmetadata", handleLoadedMetadata);
+  };
+}, [currentIndex]);
+
 
   const togglePlayPause = () => {
     const video = videoRef.current;
@@ -114,6 +142,10 @@ export default function Home() {
     setCurrentIndex(0);
   };
 
+  const handleVideoEnd = () => {
+    setCurrentIndex((prevIndex) => (prevIndex + 1) % videoList.length);
+  };
+
   return (
     <div className="w-screen h-screen flex bg-[#222] p-4 gap-4">
       {/* Galeria de imagens */}
@@ -151,6 +183,7 @@ export default function Home() {
           src={videoList[currentIndex].src}
           onTimeUpdate={updateCurrentTime}
           onError={handleVideoError}
+          onEnded={handleVideoEnd}
           controls={false}
         />
 
@@ -161,8 +194,14 @@ export default function Home() {
           value={currentTime}
           step={0.1}
           onChange={(e) => changeTime(Number(e.target.value))}
-          className="w-full mb-3"
+          className="w-full mb-2"
         />
+
+        {/* Exibir tempo atual / duração */}
+        <div className="text-black text-sm mb-3 flex justify-between">
+          <span>{formatTime(currentTime)}</span>
+          <span>{formatTime(videoRef.current?.duration || 0)}</span>
+        </div>
 
         <div className="flex justify-center items-center gap-6">
           <button
